@@ -1,0 +1,31 @@
+{
+  "name": "redux-schema-form",
+  "version": "1.0.0",
+  "description": "A modified fork of [react-schema-form](https://github.com/networknt/react-schema-form).",
+  "main": "./lib/ReduxSchemaForm.js",
+  "files": [
+    "lib/"
+  ],
+  "directories": {
+    "lib": "lib/",
+    "src": "src/"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "prepublish": "babel src -d lib --presets=react,es2015",
+    "build": "node ./node_modules/babel-cli/bin/babel src -d lib --presets=react,es2015"
+  },
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "react": "^15.4.2",
+    "react-dom": "^15.4.2",
+    "react-schema-form": "^0.3.2"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.24.0",
+    "babel-core": "^6.24.0",
+    "babel-preset-latest": "^6.24.0",
+    "babel-preset-react": "^6.23.0"
+  }
+}
