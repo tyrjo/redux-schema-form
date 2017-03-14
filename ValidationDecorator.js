@@ -1,5 +1,5 @@
 import React, {PropTypes} from 'react';
-let utils = require('react-schema-form/lib/utils');
+const utils = require('react-schema-form/lib/utils');
 
 const ValidationDecorator = (FormItem) => {
 
@@ -15,11 +15,21 @@ const ValidationDecorator = (FormItem) => {
       this.onChangeValidate = this.onChangeValidate.bind(this);
       this.validate = this.validate.bind(this);
       this.localModel = this.localModel.bind(this);
+      this.builder = this.builder.bind(this);
     }
 
     componentWillMount() {
-      let defaultValue = this.defaultValue();
-      let validationResult = this.internalValidate(defaultValue, false);
+      // schema is copied onto the form by SchemaForm if a the key is set
+      if (!this.props.form.key) {
+        throw(
+          `Error: form.key not set.
+Form element '${this.props.form.type}' requires a 'key' property.  For elements that accept data input,
+this 'key' must match one of the schema 'properties' attributes.`
+        );
+      }
+
+      const defaultValue = this.defaultValue();
+      const validationResult = this.internalValidate(defaultValue, false);
       this.props.onChange(this.props.form.key, validationResult);
       this.props.extraProps.registerValidationListener(this.validate);
     }
@@ -30,16 +40,36 @@ const ValidationDecorator = (FormItem) => {
 
     internalValidate(value, markFieldDirty) {
       //console.log('onChangeValidate this.props.form, value', this.props.form, value);
-      let validationResult = utils.validate(this.props.form, value);
-      let result = {
+      const validationResult = utils.validate(this.props.form, value);
+      return {
         key: this.props.form.key,
         value: value,
         valid: validationResult.valid,
         error: validationResult.valid ? null : validationResult.error.message,
         dirty: markFieldDirty,
       };
+    }
 
-      return result;
+    // TODO (tyr) Is there a way to merge with SchemaForm.builder?
+    builder(form, key) {
+      const type = form.type;
+      const Field = this.props.mapper[type];
+      if (!Field) {
+        console.log('Invalid element type: \"' + type + '\"!'); // eslint-disable-line no-console
+        return null;
+      }
+      if (form.condition && eval(form.condition) === false) {
+        return null;
+      }
+      return (
+        <Field
+          key={key}
+          model={this.props.model}
+          form={form}
+          onChange={this.props.onChange}
+          mapper={this.props.mapper}
+          builder={this.builder}
+          extraProps={this.props.extraProps}/>);
     }
 
     /**
@@ -69,14 +99,20 @@ const ValidationDecorator = (FormItem) => {
         value = e.target.value;
       }
 
-      let validationResult = this.internalValidate(value, true);
+      const validationResult = this.internalValidate(value, true);
 
       //console.log('conhangeValidate this.props.form.key, value', this.props.form.key, value);
       this.props.onChange(this.props.form.key, validationResult);
     }
 
     localModel() {
-      return utils.selectOrSet(this.props.form.key, this.props.model) || {};
+      let result;
+      try {
+        result = utils.selectOrSet(this.props.form.key, this.props.model) || {};
+      } catch (e) {
+        result = {};
+      }
+      return result;
     }
 
     defaultValue() {
@@ -88,6 +124,7 @@ const ValidationDecorator = (FormItem) => {
       //console.log('Text defaultValue value = ', value);
 
       // check if there is a default value
+      // TODO: using falsy checking may be inadequate here.  Perhaps use lodash.isUndefined()?
       if (!value && this.props.form['default']) {
         value = this.props.form['default'];
       }
@@ -112,6 +149,7 @@ const ValidationDecorator = (FormItem) => {
           {...this.state}
           localModel={this.localModel()}
           onChangeValidate={this.onChangeValidate}
+          builder={this.builder}
         />
       );
     }
@@ -119,9 +157,17 @@ const ValidationDecorator = (FormItem) => {
 
   DecoratorClass.propTypes = {
     model: PropTypes.object.isRequired,
-    form: PropTypes.object.isRequired,
+    form: PropTypes.shape({
+      key: PropTypes.array.isRequired,
+      type: PropTypes.string.isRequired,
+      schema: PropTypes.object,
+      default: PropTypes.object,
+      titleMap: PropTypes.array,
+    }).isRequired,
     onChange: PropTypes.func.isRequired,
     extraProps: PropTypes.object.isRequired,
+    mapper: PropTypes.object.isRequired,
+    builder: PropTypes.func.isRequired,
   };
 
   return DecoratorClass;

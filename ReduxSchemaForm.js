@@ -1,8 +1,10 @@
 import React, {PropTypes} from 'react';
 import {connect} from 'react-redux';
 import {bindActionCreators} from 'redux';
+import mapValues from 'lodash/mapValues';
 
 import SchemaForm from './SchemaForm';
+const utils = require('react-schema-form/lib/utils');
 import * as actions from './actionCreators';
 
 class ReduxSchemaForm extends React.Component {
@@ -41,6 +43,11 @@ class ReduxSchemaForm extends React.Component {
       key,
       validationResult
     );
+    // TODO (tyr) perhaps this can be done before dispatching action and removed
+    // from reducer
+    utils.selectOrSet(key, this.props.model, validationResult);
+    const cleanModel = mapValues(this.props.model, 'value');
+    this.props.onModelChange(cleanModel);
   }
 
   /**
@@ -59,12 +66,7 @@ class ReduxSchemaForm extends React.Component {
   onSubmit() {
     if (this.validateAll(true) && this.props.onSubmit) {
       // the model is valid, strip off internal validation state
-      let cleanModel = {};
-      for (let key in this.props.model) {
-        if (this.props.model[key].value) {
-          cleanModel[key] = this.props.model[key].value;
-        }
-      }
+      const cleanModel = mapValues(this.props.model, 'value');
       this.props.onSubmit(cleanModel);
     }
   }
@@ -76,22 +78,20 @@ class ReduxSchemaForm extends React.Component {
    * @returns {boolean} If true, all fields are valid. If false, one or more fields are invalid.
    */
   validateAll(markFieldsDirty) {
-    let formValid = true;
-    this.validators.forEach((validator)=> {
-      let validationResult = validator(markFieldsDirty);
+    const results = this.validators.map((validator)=> {
+      const validationResult = validator(markFieldsDirty);
       if (markFieldsDirty) {
         // Call the normal onModelChange handler to set the updated validation state into the store
         this.onModelChange(validationResult.key, validationResult);
       }
-      if (!validationResult.valid) {
-        formValid = false;
-      }
+      return validationResult.valid;
     });
-    return formValid;
+
+    return results.every(x => x);
   }
 
   render() {
-    let {schema, form, model, componentMap} = this.props;
+    const {schema, form, model, componentMap} = this.props;
     return (
       <SchemaForm
         schema={schema}
@@ -114,6 +114,7 @@ ReduxSchemaForm.propTypes = {
   form: PropTypes.array,
   model: PropTypes.object.isRequired,
   onSubmit: PropTypes.func,
+  onModelChange: PropTypes.func,
   actions: PropTypes.object.isRequired,
   componentMap: PropTypes.object.isRequired,
 };
@@ -121,13 +122,11 @@ ReduxSchemaForm.propTypes = {
 ReduxSchemaForm.defaultProps = {
   form: ["*"],
   onSubmit: null,
+  onModelChange: ()=>{},
 };
 
 function mapStateToProps(state, ownProps) {
-  let newModel = {};
-  for (let key in ownProps.model) {
-    newModel[key] = {value: ownProps.model[key]};
-  }
+  const newModel = mapValues(ownProps.model, (x) => ({value: x}));
   return {
     model: state.schemaForm[ownProps.id] || newModel,
   };
