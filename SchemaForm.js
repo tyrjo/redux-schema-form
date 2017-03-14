@@ -2,46 +2,44 @@
  * Created by steve on 11/09/15.
  */
 import React, {PropTypes} from 'react';
-let utils = require('react-schema-form/lib/utils');
-import _ from 'lodash';
+const utils = require('react-schema-form/lib/utils');
+import merge from 'lodash/merge';
 
 class SchemaForm extends React.Component {
+
+  static builder(form, model, index, onChange, mapper, extraProps) {
+    const type = form.type;
+    const Field = mapper[type];
+    if (!Field) {
+      console.log('Invalid element type: \"' + form.type + '\"!'); // eslint-disable-line no-console
+      return null;
+    }
+    // TODO (tyr) investigate new Function() instead of eval
+    if (form.condition && eval(form.condition) === false) {
+      return null;
+    }
+    return (
+      <Field model={model} form={form} key={index} onChange={onChange} mapper={mapper} builder={SchemaForm.builder}
+             extraProps={extraProps}/>);
+  }
 
   constructor(props) {
     super(props);
     this.onChange = this.onChange.bind(this);
+    this.mapper = {};
   }
-
-  mapper = {};
 
   onChange(key, val) {
     //console.log('SchemaForm.onChange', key, val);
     this.props.onModelChange(key, val);
   }
 
-  builder(form, model, index, onChange, mapper, extraProps) {
-    let type = form.type;
-    let Field = this.mapper[type];
-    if (!Field) {
-      console.log('Invalid field: \"' + form.key[0] + '\"!'); // eslint-disable-line no-console
-      return null;
-    }
-    if (form.condition && eval(form.condition) === false) {
-      return null;
-    }
-    return (<Field model={model} form={form} key={index} onChange={onChange} mapper={mapper} builder={this.builder}
-                  extraProps={extraProps}/>);
-  }
-
   render() {
-    let merged = utils.merge(this.props.schema, this.props.form, this.props.ignore, this.props.option);
-    //console.log('SchemaForm merged = ', JSON.stringify(merged, undefined, 2));
-    let mapper = this.mapper;
-    if (this.props.mapper) {
-      mapper = _.merge(this.mapper, this.props.mapper);
-    }
-    let forms = merged.map(function (form, index) {
-      return this.builder(form, this.props.model, index, this.onChange, mapper, this.props.extraProps);
+    const merged = utils.merge(this.props.schema, this.props.form, this.props.ignore, this.props.option);
+    // Will overlay this.mapper with any nested values from this.props.mapper
+    const mapper = merge(this.mapper, this.props.mapper || {});
+    const forms = merged.map(function (form, index) {
+      return SchemaForm.builder(form, this.props.model, index, this.onChange, mapper, this.props.extraProps);
     }.bind(this));
 
     return (
